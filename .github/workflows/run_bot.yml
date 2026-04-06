@@ -1,15 +1,14 @@
-name: Run PSXBOT News Scraper
+name: Continuous PSXBOT Bot
 
 on:
-  schedule:
-    - cron: '*/2 * * * *' # Runs every 2 minutes
-  workflow_dispatch:
+  workflow_dispatch:  # manual trigger to start the bot
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # Force Node.js 24
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # skip Node.js 20 warnings
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,17 +18,9 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Upgrade pip
-        run: python -m pip install --upgrade pip
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Run Bot Script
+      - name: Run bot.py continuously
         run: |
-          if [ -f "bot.py" ]; then
-            python bot.py.py
-          else
-            echo "Error: bot.py not found!"
-            exit 1
-          fi
+          echo "Starting bot.py..."
+          # Run in background so the workflow step doesn't block
+          nohup python bot.py > bot.log 2>&1 &
+          echo "bot.py is running in background. Logs are in bot.log"
