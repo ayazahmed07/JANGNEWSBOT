@@ -1,120 +1,122 @@
 import requests
 from bs4 import BeautifulSoup
 import os
+import time
 
 # --- Configuration ---
-# 🔹 News Source: Daily Jang (Urdu)
 JANG_LATEST_URL = "https://jang.com.pk/category/latest-news"
 
-# 🔹 WhatsApp API Settings (UltraMsg)
 # ⚠️ Replace these with your actual UltraMsg credentials
 INSTANCE_ID = "instance168787"
 TOKEN = "fposw4le00f7yreu"
-PHONE = "923322894427"
+PHONE = "923342894427"
 
-# --- News Fetching Logic ---
+# Log file
+LOG_FILE = "bot.log"
+LAST_FILE = "last.txt"
+
+# --- Helper Functions ---
+
+def log(message):
+    """Append message with timestamp to bot.log and print it."""
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    full_message = f"[{timestamp}] {message}"
+    print(full_message)
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(full_message + "\n")
+
 def fetch_latest_headline():
-    """
-    Scrapes the latest headline and its full link from Jang News.
-    """
+    """Scrapes the latest headline and URL from Jang News."""
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
-    
     try:
         response = requests.get(JANG_LATEST_URL, headers=headers, timeout=10)
         response.raise_for_status()
-        
         soup = BeautifulSoup(response.content, 'html.parser')
-        
-        # Jang headlines are usually in <h2> tags. We look for the first one.
         headline_tag = soup.find('h2')
-        
         if not headline_tag:
-            print("❌ No headlines found on the page.")
+            log("❌ No headlines found.")
             return None, None
 
-        # Extract the headline text
         title = headline_tag.get_text(strip=True)
-        
-        # Find the parent link (<a>) to get the full story URL
         link_tag = headline_tag.find_parent('a') or headline_tag.find('a')
-        
-        # If the headline itself isn't a link, look for the closest link
         if not link_tag:
             link_tag = headline_tag.find_previous('a') or headline_tag.find_next('a')
 
         story_url = ""
         if link_tag and link_tag.get('href'):
             story_url = link_tag.get('href')
-            # Ensure the URL is absolute
             if not story_url.startswith('http'):
                 story_url = f"https://jang.com.pk/{story_url.lstrip('/')}"
-
         return title, story_url
-
     except Exception as e:
-        print(f"❌ Error fetching news: {e}")
+        log(f"❌ Error fetching news: {e}")
         return None, None
 
-# --- Helper Functions ---
 def get_last_seen_headline():
-    """Reads the last sent headline from last.txt to avoid duplicates."""
-    if not os.path.exists("last.txt"):
+    """Reads the last sent headline from last.txt"""
+    if not os.path.exists(LAST_FILE):
         return ""
     try:
-        with open("last.txt", "r", encoding="utf-8") as f:
+        with open(LAST_FILE, "r", encoding="utf-8") as f:
             return f.read().strip()
-    except Exception:
+    except Exception as e:
+        log(f"❌ Error reading last.txt: {e}")
         return ""
 
 def update_last_seen_headline(title):
-    """Saves the latest headline title to last.txt."""
-    with open("last.txt", "w", encoding="utf-8") as f:
-        f.write(title)
+    """Saves the latest headline title to last.txt"""
+    try:
+        with open(LAST_FILE, "w", encoding="utf-8") as f:
+            f.write(title)
+    except Exception as e:
+        log(f"❌ Error writing last.txt: {e}")
 
 def send_to_whatsapp(title, link):
-    """Sends the news headline and link via UltraMsg WhatsApp API."""
+    """Sends the news headline via UltraMsg WhatsApp API"""
     api_url = f"https://api.ultramsg.com/{INSTANCE_ID}/messages/chat"
-    
-    # Format the message
     message = f"📰 *Jang Breaking News:*\n\n{title}"
     if link:
         message += f"\n\n🔗 *Read Full Story:*\n{link}"
 
-    payload = {
-        "token": TOKEN,
-        "to": PHONE,
-        "body": message
-    }
-    
+    payload = {"token": TOKEN, "to": PHONE, "body": message}
     try:
         response = requests.post(api_url, data=payload, timeout=15)
         if response.status_code == 200:
-            print("✅ WhatsApp message sent successfully!")
+            log("✅ WhatsApp message sent successfully!")
         else:
-            print(f"⚠️ WhatsApp API returned error: {response.text}")
+            log(f"⚠️ WhatsApp API returned error: {response.text}")
     except Exception as e:
-        print(f"❌ Error sending WhatsApp: {e}")
+        log(f"❌ Error sending WhatsApp: {e}")
 
 # --- Main Logic ---
 def main():
-    print("🔍 Checking for new Jang headlines...")
-    
+    log("🔍 Checking for new Jang headlines...")
     title, link = fetch_latest_headline()
-    
     if not title:
-        print("⏭️ Skipping update (Fetch failed).")
+        log("⏭️ Skipping update (Fetch failed).")
         return
-
     last_title = get_last_seen_headline()
-
     if title != last_title:
-        print(f"🆕 New Headline: {title}")
+        log(f"🆕 New Headline: {title}")
         send_to_whatsapp(title, link)
         update_last_seen_headline(title)
     else:
-        print("😴 No new updates found.")
+        log("😴 No new updates found.")
+
+# --- Continuous Loop ---
+def main_loop():
+    while True:
+        try:
+            main()
+        except Exception as e:
+            log(f"❌ Error in main loop: {e}")
+        log("⏳ Waiting 10 seconds before next check...")
+        time.sleep(10)  # Change to 600 for 10-minute interval
 
 if __name__ == "__main__":
-    main()
+    # Make sure last.txt exists
+    if not os.path.exists(LAST_FILE):
+        open(LAST_FILE, "w").close()
+    main_loop()
