@@ -7,16 +7,12 @@ import os
 JANG_LATEST_URL = "https://jang.com.pk/category/latest-news"
 
 # 🔹 WhatsApp API Settings (UltraMsg)
-INSTANCE_ID = os.getenv("WHATSAPP_INSTANCE_ID")
-TOKEN = os.getenv("WHATSAPP_TOKEN")
-PHONE = os.getenv("WHATSAPP_PHONE")
-
-if not all([INSTANCE_ID, TOKEN, PHONE]):
-    print("❌ Error: Missing WhatsApp API credentials in environment variables.")
-    exit(1)
+# ⚠️ Replace these with your actual UltraMsg credentials
+INSTANCE_ID = "instance168787"
+TOKEN = "fposw4le00f7yreu"
+PHONE = "923322894427"
 
 # --- News Fetching Logic ---
-
 def fetch_latest_headline():
     """
     Scrapes the latest headline and its full link from Jang News.
@@ -54,7 +50,7 @@ def fetch_latest_headline():
             # Ensure the URL is absolute
             if not story_url.startswith('http'):
                 story_url = f"https://jang.com.pk/{story_url.lstrip('/')}"
-        
+
         return title, story_url
 
     except Exception as e:
@@ -62,7 +58,6 @@ def fetch_latest_headline():
         return None, None
 
 # --- Helper Functions ---
-
 def get_last_seen_headline():
     """Reads the last sent headline from last.txt to avoid duplicates."""
     if not os.path.exists("last.txt"):
@@ -103,7 +98,6 @@ def send_to_whatsapp(title, link):
         print(f"❌ Error sending WhatsApp: {e}")
 
 # --- Main Logic ---
-
 def main():
     print("🔍 Checking for new Jang headlines...")
     
